@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Voice Assistant Service with Application Load Balancer
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: prod
+    Description: Environment name for the deployment
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: EC2 instance type
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: AMI ID for EC2 instances
+
+Resources:
+  # IAM Role for EC2
+  VoiceAssistantRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: VoiceAssistantPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - polly:SynthesizeSpeech
+                  - transcribe:StartStreamTranscription
+                  - transcribe:StartStreamTranscriptionWebSocket
+                Resource: '*'
+
+  VoiceAssistantInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: VoiceAssistantRole
+
+  # Security Groups
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Application Load Balancer
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EC2 instances
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5050
+          ToPort: 5050
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Type: application
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 5050
+      Protocol: HTTP
+      TargetType: instance
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref AWS::VPC::Id
+
+  # Launch Template
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref EC2SecurityGroup
+        IamInstanceProfile:
+          Name: !Ref VoiceAssistantInstanceProfile
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # Update system
+            yum update -y
+            yum install -y git
+
+            # Install Node.js
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+            yum install -y nodejs
+
+            # Create app directory
+            mkdir -p /opt/voice-assistant
+            cd /opt/voice-assistant
+
+            # Clone application (replace with your repo URL)
+            git clone https://github.com/your-repo/voice-assistant.git .
+
+            # Setup environment
+            cat > /opt/voice-assistant/.env << EOL
+            NODE_ENV=production
+            PORT=5050
+            AWS_REGION=${AWS::Region}
+            VOICE_ID=Ruth
+            TTS_PROVIDER=polly
+            EOL
+
+            # Install dependencies
+            npm install
+
+            # Setup systemd service
+            cat > /etc/systemd/system/voice-assistant.service << EOL
+            [Unit]
+            Description=Voice Assistant Service
+            After=network.target
+
+            [Service]
+            Type=simple
+            User=ec2-user
+            WorkingDirectory=/opt/voice-assistant
+            Environment=NODE_ENV=production
+            ExecStart=/usr/bin/node src/server.js
+            Restart=always
+            RestartSec=10
+
+            [Install]
+            WantedBy=multi-user.target
+            EOL
+
+            # Start service
+            systemctl daemon-reload
+            systemctl enable voice-assistant
+            systemctl start voice-assistant
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      DesiredCapacity: 2
+      MaxSize: 4
+      MinSize: 1
+      TargetGroupARNs:
+        - !Ref ALBTargetGroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+
+  # Scaling Policies
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: 300
+      ScalingAdjustment: 1
+
+  ScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: 300
+      ScalingAdjustment: -1
+
+  # CloudWatch Alarms
+  CPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale up if CPU > 70% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+
+  CPUAlarmLow:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale down if CPU < 30% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 30
+      AlarmActions:
+        - !Ref ScaleDownPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: LessThanThreshold
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name of the Application Load Balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  AutoScalingGroupName:
+    Description: Name of Auto Scaling Group
+    Value: !Ref AutoScalingGroup
+
+  TargetGroupARN:
+    Description: ARN of Target Group
+    Value: !Ref ALBTargetGroup
