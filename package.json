@@ -27,7 +27,7 @@
         "@aws-sdk/client-s3": "^3.701.0",
         "@aws-sdk/lib-dynamodb": "^3.699.0",
         "@aws-sdk/util-dynamodb": "^3.x",
-        "interleave-stream": "^1.0.2",
+        "interleave-stream": "^1.0.2"
     },
     "devDependencies": {
         "eslint": "^8.x",
