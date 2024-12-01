@@ -3,13 +3,14 @@ import alawmulaw from 'alawmulaw';
 
 export class PollyTTSService {
     constructor(config) {
-        this.polly = new AWS.Polly({
-            region: config.aws.region
-            // credentials: {
-            //     accessKeyId: config.aws.accessKeyId,
-            //     secretAccessKey: config.aws.secretAccessKey
-            // }
-        });
+        // this.polly = new AWS.Polly({
+        //     region: config.aws.region
+        //     // credentials: {
+        //     //     accessKeyId: config.aws.accessKeyId,
+        //     //     secretAccessKey: config.aws.secretAccessKey
+        //     // }
+        // });
+        this.polly = new AWS.Polly();
         this.cache = new Map();
         this.config = config;
        
