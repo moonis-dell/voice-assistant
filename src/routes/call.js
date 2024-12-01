@@ -30,7 +30,7 @@ export async function callRoutes(fastify) {
                 <Response>
                     <Say>Welcome to the Voice Assistant Service.</Say>
                     <Connect>
-                        <Stream url="ws://${request.headers.host}/media-stream" />
+                        <Stream url="ws://http://stack--appli-78a3kyaajsj9-1756093919.us-east-1.elb.amazonaws.com/media-stream" />
                     </Connect>
                 </Response>`;
             
