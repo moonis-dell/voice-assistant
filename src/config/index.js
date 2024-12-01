@@ -56,7 +56,7 @@ export const config = {
     },
     logging: {
         level: process.env.LOG_LEVEL || 'info',
-        prettyPrint: process.env.NODE_ENV !== 'production'
+        prettyPrint: true,//process.env.NODE_ENV !== 'production'
     },
     groq: {
         enabled: process.env.GROQ_ENABLED === 'true',

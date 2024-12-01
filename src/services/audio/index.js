@@ -19,7 +19,7 @@ export async function setupWebSocketHandler(connection, req) {
     let responseService = null;
     let transcriptionStream = null;
     let transcriptService = null;
-  
+
 
     // Initialize services
     try {
@@ -38,7 +38,7 @@ export async function setupWebSocketHandler(connection, req) {
     socket.on('message', async (data) => {
         try {
             const msg = JSON.parse(data.toString());
-            
+
             if (msg.event === 'start') {
                 streamSid = msg.start.streamSid;
                 logger.info({ streamSid }, 'Stream started');
@@ -54,37 +54,19 @@ export async function setupWebSocketHandler(connection, req) {
                         for await (const event of transcriptionStream.TranscriptResultStream) {
                             if (event.TranscriptEvent?.Transcript?.Results?.[0]) {
                                 const result = event.TranscriptEvent.Transcript.Results[0];
-                                
+
                                 if (!result.IsPartial) {
                                     const transcript = result.Alternatives[0].Transcript;
-                                    logger.info({ streamSid,transcript }, 'Received transcript');       
-                                    
-                                    ///////////////////////////////////////////////////////////////////////////
-                                    turnCounter++;
+                                    logger.info({ streamSid, transcript }, 'Received transcript');
 
-                                    // Save customer transcript
-                                    await transcriptService.saveTranscript({
-                                        callId: streamSid,
-                                        actor: 'customer',
-                                        text: transcript,
-                                        turnId: turnCounter
-                                    });
-                                     //////////////////////////////////////////////////////////////////////////
+
 
                                     // Generate response
                                     const response = await responseService.generateResponse(transcript);
-                                    logger.info({ streamSid,response }, 'Generated response');
+                                    logger.info({ streamSid, response }, 'Generated response');
 
-                                    //////////////////////////////////////////////////////////////////////////////
-                                     // Save customer transcript
-                                    await transcriptService.saveTranscript({
-                                        callId: streamSid,
-                                        actor: 'agent',
-                                        text: response,
-                                        turnId: turnCounter
-                                    });
-                                  ////////////////////////////////////////////////////////////////////////////////  
-                                    
+
+
 
                                     // Verify streamSid exists before sending response
                                     if (response && streamSid) {
@@ -103,6 +85,33 @@ export async function setupWebSocketHandler(connection, req) {
                                         } catch (error) {
                                             logger.error({ streamSid }, 'TTS error:', error);
                                         }
+
+                                        ///////////////////////////////////////////////////////////////////////////
+                                        turnCounter++;
+
+                                        // Save customer transcript
+                                        await transcriptService.saveTranscript({
+                                            callId: streamSid,
+                                            actor: 'customer',
+                                            text: transcript,
+                                            turnId: turnCounter
+                                        });
+                                        //////////////////////////////////////////////////////////////////////////
+
+
+                                        //////////////////////////////////////////////////////////////////////////////
+                                        // Save customer transcript
+                                        await transcriptService.saveTranscript({
+                                            callId: streamSid,
+                                            actor: 'agent',
+                                            text: response,
+                                            turnId: turnCounter
+                                        });
+                                        ////////////////////////////////////////////////////////////////////////////////  
+
+
+
+
                                     } else {
                                         logger.warn('No streamSid available for response');
                                     }
@@ -142,11 +151,11 @@ export async function setupWebSocketHandler(connection, req) {
         cleanupResources();
     });
 
-   async function cleanupResources() {
+    async function cleanupResources() {
         try {
             if (audioTransformer) {
                 audioTransformer.end();
-            }            
+            }
             socket.close();
             if (socket.readyState === socket.OPEN) {
                 socket.close();
