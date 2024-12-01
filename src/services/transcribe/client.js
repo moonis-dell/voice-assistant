@@ -7,16 +7,16 @@ import { logger } from '../../utils/logger.js';
 
 export class TranscribeClient {
     constructor(config) {
-        if (!config.aws.accessKeyId || !config.aws.secretAccessKey) {
-            throw new Error('AWS credentials not provided');
-        }
+        // if (!config.aws.accessKeyId || !config.aws.secretAccessKey) {
+        //     throw new Error('AWS credentials not provided');
+        // }
 
         this.client = new TranscribeStreamingClient({
-            region: config.aws.region,
-            credentials: {
-                accessKeyId: config.aws.accessKeyId,
-                secretAccessKey: config.aws.secretAccessKey
-            }          
+            region: config.aws.region
+            // credentials: {
+            //     accessKeyId: config.aws.accessKeyId,
+            //     secretAccessKey: config.aws.secretAccessKey
+            // }          
         });
         this.config = config;
     }
