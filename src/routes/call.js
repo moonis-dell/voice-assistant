@@ -30,7 +30,7 @@ export async function callRoutes(fastify) {
                 <Response>
                     <Say>Welcome to the Voice Assistant Service.</Say>
                     <Connect>
-                        <Stream url="ws://${request.headers.host}/media-stream" />
+                        <Stream url="wss://${request.headers.host}/media-stream" />
                     </Connect>
                 </Response>`;
                 logger.info({ twimlResponse }, 'twiml response');
