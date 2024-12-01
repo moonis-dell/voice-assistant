@@ -10,7 +10,7 @@ import { logger } from '../../utils/logger.js';
 export class TranscriptService {
     constructor(config) {
         const client = new DynamoDBClient({
-            region: config.aws.region
+            region: config.aws.region,
             // credentials: {
             //     accessKeyId: config.aws.accessKeyId,
             //     secretAccessKey: config.aws.secretAccessKey

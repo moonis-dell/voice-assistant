@@ -12,7 +12,7 @@ export class TranscribeClient {
         // }
 
         this.client = new TranscribeStreamingClient({
-            region: config.aws.region
+            region: config.aws.region,
             // credentials: {
             //     accessKeyId: config.aws.accessKeyId,
             //     secretAccessKey: config.aws.secretAccessKey
