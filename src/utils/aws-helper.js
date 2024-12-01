@@ -6,10 +6,10 @@ export class AWSHelper {
     static setupAWS(config) {
         AWS.config.update({
             region: config.aws.region,
-            credentials: {
-                accessKeyId: config.aws.accessKeyId,
-                secretAccessKey: config.aws.secretAccessKey
-            },
+            // credentials: {
+            //     accessKeyId: config.aws.accessKeyId,
+            //     secretAccessKey: config.aws.secretAccessKey
+            // },
             maxRetries: config.aws.maxRetries,
             httpOptions: {
                 timeout: config.aws.timeout
