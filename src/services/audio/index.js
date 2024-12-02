@@ -66,7 +66,7 @@ export async function setupWebSocketHandler(connection, req) {
 
 
                                     // Generate response
-                                    const response = await responseService.generateResponse(transcript);
+                                    const response = await responseService.generateResponse(transcript,streamSid);
                                     logger.info({ streamSid, response }, 'Generated response');
 
 
