@@ -87,26 +87,26 @@ export async function setupWebSocketHandler(connection, req) {
                                         }
 
                                         ///////////////////////////////////////////////////////////////////////////
-                                        turnCounter++;
+                                        //turnCounter++;
 
                                         // Save customer transcript
-                                        await transcriptService.saveTranscript({
-                                            callId: streamSid,
-                                            actor: 'customer',
-                                            text: transcript,
-                                            turnId: turnCounter
-                                        });
+                                        // await transcriptService.saveTranscript({
+                                        //     callId: streamSid,
+                                        //     actor: 'customer',
+                                        //     text: transcript,
+                                        //     turnId: turnCounter
+                                        // });
                                         //////////////////////////////////////////////////////////////////////////
 
 
                                         //////////////////////////////////////////////////////////////////////////////
                                         // Save customer transcript
-                                        await transcriptService.saveTranscript({
-                                            callId: streamSid,
-                                            actor: 'agent',
-                                            text: response,
-                                            turnId: turnCounter
-                                        });
+                                        // await transcriptService.saveTranscript({
+                                        //     callId: streamSid,
+                                        //     actor: 'agent',
+                                        //     text: response,
+                                        //     turnId: turnCounter
+                                        // });
                                         ////////////////////////////////////////////////////////////////////////////////  
 
 
@@ -127,7 +127,7 @@ export async function setupWebSocketHandler(connection, req) {
                 if (!isStreamStarted) {
                     logger.warn('Received media before stream start');
                     return;
-                }
+                }                
                 audioTransformer.write(data.toString());
 
             } else if (msg.event === 'stop') {

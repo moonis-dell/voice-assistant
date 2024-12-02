@@ -1,5 +1,6 @@
 // src/services/response/groq-generator.js
 import { BaseResponseGenerator } from './base.js';
+import { BasicResponseGenerator } from './basic-generator.js';
 import Groq from 'groq-sdk';
 import { logger } from '../../utils/logger.js';
 
@@ -11,21 +12,26 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
         });
         this.config = config;
         this.conversationHistory = new Map();
-        this.systemPrompt = `You are an empathetic and professional First Notice of Loss (FNOL) agent for car insurance claims 
-        efficiently gathering essential information about their accident. 
-        Collect the following information:
-      - Full name
-      - Policy number
-      - Car details
-      - Accident details
-      - Location
-      Ask one question at a time and be supportive.`;
+        this.basicGenerator = new BasicResponseGenerator();
+        
+        // Optimized system prompt for shorter responses
+        this.systemPrompt = `You are a concise FNOL agent collecting accident info.
+Rules:
+- One short question per response
+- Max 10-15 words per response
+- No pleasantries or explanations
+- Just ask for: name, policy number, car details, accident details, or location
+Example responses:
+"What is your full name?"
+"Please provide your policy number."
+"Where did the accident occur?"`;
     }
 
     async generateResponse(transcript, sessionId = null) {
+        const startTime = process.hrtime();
         try {
             const context = sessionId ?
-                this.getConversationHistory(sessionId) :
+                this.getConversationHistory(sessionId).slice(-2) : // Reduced context
                 [];
 
             const completion = await this.client.chat.completions.create({
@@ -44,9 +50,19 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
                         content: transcript
                     }
                 ],
-                temperature: this.config.groq.temperature,
-                max_tokens: this.config.groq.maxTokens,
+                temperature: 0.3, // Lower temperature for more focused responses
+                max_tokens: 25,   // Reduced max tokens
                 top_p: 1
+            });
+
+            const endTime = process.hrtime(startTime);
+            const latencyMs = endTime[0] * 1000 + endTime[1] / 1000000;
+
+            logger.info({
+                type: 'groq_api_latency',
+                latency: latencyMs,
+                sessionId,
+                responseLength: completion.choices[0]?.message?.content.length
             });
 
             const response = completion.choices[0]?.message?.content ||
@@ -59,19 +75,28 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
             return response;
 
         } catch (error) {
-            logger.error('GROQ response generation error:', error);
+            logger.error('Groq API error:', error);
             return this.getFallbackResponse(transcript);
         }
     }
 
     getFallbackResponse(transcript) {
-        const basic = new BasicResponseGenerator();
-        return basic.generateResponse(transcript);
+        const basicResponses = {
+            name: "What is your full name?",
+            policy: "What's your policy number?",
+            car: "What's the make and model of your car?",
+            accident: "When did the accident occur?",
+            location: "Where did the accident happen?"
+        };
+
+        // Return a random basic response
+        const responses = Object.values(basicResponses);
+        return responses[Math.floor(Math.random() * responses.length)];
     }
 
     getConversationHistory(sessionId) {
         const history = this.conversationHistory.get(sessionId) || [];
-        return history.slice(-5); // Last 5 exchanges
+        return history.slice(-2); // Keep only last 2 exchanges
     }
 
     storeExchange(sessionId, userInput, assistantResponse) {
@@ -82,7 +107,7 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
             timestamp: new Date().toISOString()
         });
 
-        if (history.length > 10) {
+        if (history.length > 5) { // Reduced history size
             history.shift();
         }
 

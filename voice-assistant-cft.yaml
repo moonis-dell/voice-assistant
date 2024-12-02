@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Voice Assistant Service with Application Load Balancer
+Description: Voice Assistant Service with Application Load Balancer (AL2023)
 
 Parameters:
   EnvironmentName:
@@ -22,8 +22,8 @@ Parameters:
 
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
-    Description: AMI ID for EC2 instances
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+    Description: Amazon Linux 2023 AMI ID
 
 Resources:
   # IAM Role for EC2
@@ -62,6 +62,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for Application Load Balancer
+      VpcId: vpc-0b57beecfa85ee517
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -76,6 +77,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for EC2 instances
+      VpcId: vpc-0b57beecfa85ee517
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5050
@@ -85,6 +87,11 @@ Resources:
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
 
   # Application Load Balancer
   ApplicationLoadBalancer:
@@ -93,6 +100,9 @@ Resources:
       Scheme: internet-facing
       SecurityGroups:
         - !Ref ALBSecurityGroup
+      Subnets:
+        - subnet-088fe0d82efed64f0
+        - subnet-0c38122943719196d
       Type: application
 
   ALBListener:
@@ -117,147 +127,140 @@ Resources:
       Protocol: HTTP
       TargetType: instance
       UnhealthyThresholdCount: 5
-      VpcId: !Ref AWS::VPC::Id
+      VpcId: vpc-0b57beecfa85ee517
+      Targets: 
+        - Id: !Ref VoiceAssistantInstance
+          Port: 5050
 
-  # Launch Template
-  LaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
+  # EC2 Instance
+  VoiceAssistantInstance:
+    Type: AWS::EC2::Instance
     Properties:
-      LaunchTemplateData:
-        ImageId: !Ref AmiId
-        InstanceType: !Ref InstanceType
-        KeyName: !Ref KeyName
-        SecurityGroupIds:
-          - !Ref EC2SecurityGroup
-        IamInstanceProfile:
-          Name: !Ref VoiceAssistantInstanceProfile
-        UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            # Update system
-            yum update -y
-            yum install -y git
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: subnet-088fe0d82efed64f0
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: !Ref VoiceAssistantInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+          echo "Starting user data script execution"
 
-            # Install Node.js
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-            yum install -y nodejs
+          # Update system and install base packages
+          echo "Updating system packages"
+          dnf update -y
+          dnf install -y git curl
 
-            # Create app directory
-            mkdir -p /opt/voice-assistant
-            cd /opt/voice-assistant
+          # Install Node.js 18
+          echo "Installing Node.js"
+          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+          dnf install -y nodejs
 
-            # Clone application (replace with your repo URL)
-            git clone https://github.com/your-repo/voice-assistant.git .
+          # Verify installations
+          echo "Verifying installations"
+          node --version
+          npm --version
+          git --version
 
-            # Setup environment
-            cat > /opt/voice-assistant/.env << EOL
-            NODE_ENV=production
-            PORT=5050
-            AWS_REGION=${AWS::Region}
-            VOICE_ID=Ruth
-            TTS_PROVIDER=polly
-            EOL
+          # Create app directory
+          echo "Creating application directory"
+          mkdir -p /opt/voice-assistant
+          cd /opt/voice-assistant
 
-            # Install dependencies
-            npm install
+          # Clone application
+          echo "Cloning application repository"
+          git clone https://github.com/moonis-dell/voice-assistant.git .
 
-            # Setup systemd service
-            cat > /etc/systemd/system/voice-assistant.service << EOL
-            [Unit]
-            Description=Voice Assistant Service
-            After=network.target
+          # Setup environment
+          echo "Setting up environment variables"
+          cat > /opt/voice-assistant/.env << EOL
+          NODE_ENV=production
+          PORT=5050
+          AWS_REGION=${AWS::Region}   
+          
+          # Server Configuration           
+          LOG_LEVEL=info          
 
-            [Service]
-            Type=simple
-            User=ec2-user
-            WorkingDirectory=/opt/voice-assistant
-            Environment=NODE_ENV=production
-            ExecStart=/usr/bin/node src/server.js
-            Restart=always
-            RestartSec=10
+          # AWS Polly Configuration
+          POLLY_VOICE_ID=Ruth
 
-            [Install]
-            WantedBy=multi-user.target
-            EOL
+          # Speech-to-Text Configuration
+          STT_PROVIDER=transcribe
+          TTS_PROVIDER=polly
 
-            # Start service
-            systemctl daemon-reload
-            systemctl enable voice-assistant
-            systemctl start voice-assistant
+          # WebSocket Configuration
+          WS_MAX_PAYLOAD=1048576
+          WS_PING_INTERVAL=30000
+          WS_PONG_TIMEOUT=10000
+          WS_BACKLOG=511
 
-  # Auto Scaling Group
-  AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      DesiredCapacity: 2
-      MaxSize: 4
-      MinSize: 1
-      TargetGroupARNs:
-        - !Ref ALBTargetGroup
-      LaunchTemplate:
-        LaunchTemplateId: !Ref LaunchTemplate
-        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+          #twilio 
+          TWILIO_ACCOUNT_SID=AC43ecb54d8b1a71a8b97e772bd9257b2c
+          TWILIO_AUTH_TOKEN=0901790a7cfb471f1cfb4af066301da3
 
-  # Scaling Policies
-  ScaleUpPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      Cooldown: 300
-      ScalingAdjustment: 1
+          LOG_LEVEL=info
+          NODE_ENV=development
 
-  ScaleDownPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      Cooldown: 300
-      ScalingAdjustment: -1
+          #Groq
+          RESPONSE_GENERATOR=groq
+          GROQ_ENABLED=true
+          GROQ_API_KEY=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
+          GROQ_MODEL=mixtral-8x7b-32768
+          GROQ_MAX_TOKENS=100
+          GROQ_TEMPERATURE=0.7
+          EOL
 
-  # CloudWatch Alarms
-  CPUAlarmHigh:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Scale up if CPU > 70% for 5 minutes
-      MetricName: CPUUtilization
-      Namespace: AWS/EC2
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 70
-      AlarmActions:
-        - !Ref ScaleUpPolicy
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref AutoScalingGroup
-      ComparisonOperator: GreaterThanThreshold
+          # Set permissions
+          chown -R ec2-user:ec2-user /opt/voice-assistant
 
-  CPUAlarmLow:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Scale down if CPU < 30% for 5 minutes
-      MetricName: CPUUtilization
-      Namespace: AWS/EC2
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 30
-      AlarmActions:
-        - !Ref ScaleDownPolicy
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref AutoScalingGroup
-      ComparisonOperator: LessThanThreshold
+          # Install dependencies
+          echo "Installing Node.js dependencies"
+          cd /opt/voice-assistant
+          npm install
+
+          # Setup systemd service
+          echo "Setting up systemd service"
+          cat > /etc/systemd/system/voice-assistant.service << EOL
+          [Unit]
+          Description=Voice Assistant Service
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=ec2-user
+          WorkingDirectory=/opt/voice-assistant
+          Environment=NODE_ENV=production
+          ExecStart=/usr/bin/node src/server.js
+          Restart=always
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+          EOL
+
+          # Start service
+          echo "Starting voice assistant service"
+          systemctl daemon-reload
+          systemctl enable voice-assistant
+          systemctl start voice-assistant
+
+          echo "User data script completed"
 
 Outputs:
   LoadBalancerDNS:
     Description: DNS name of the Application Load Balancer
     Value: !GetAtt ApplicationLoadBalancer.DNSName
 
-  AutoScalingGroupName:
-    Description: Name of Auto Scaling Group
-    Value: !Ref AutoScalingGroup
+  InstanceId:
+    Description: ID of the EC2 instance
+    Value: !Ref VoiceAssistantInstance
+
+  PublicIP:
+    Description: Public IP of the EC2 instance
+    Value: !GetAtt VoiceAssistantInstance.PublicIp
 
   TargetGroupARN:
     Description: ARN of Target Group
