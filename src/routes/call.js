@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 import { setupWebSocketHandler } from '../services/audio/index.js';
 import { logger } from '../utils/logger.js';
 import { validateTwilioRequest } from '../middleware/validate-twilio.js';
+import fs from 'fs';
 
 export async function callRoutes(fastify) {
     //fastify.addHook('preHandler', validateTwilioRequest);
@@ -33,9 +34,9 @@ export async function callRoutes(fastify) {
                         <Stream url="wss://${request.headers.host}/media-stream" />
                     </Connect>
                 </Response>`;
-                logger.info({ twimlResponse }, 'twiml response');
+            logger.info({ twimlResponse }, 'twiml response');
             reply.type('text/xml').send(twimlResponse);
-            
+
             logger.info({ CallSid }, 'TwiML response sent');
         } catch (error) {
             logger.error('Error handling incoming call:', error);
@@ -48,7 +49,7 @@ export async function callRoutes(fastify) {
         try {
             const { CallSid, CallStatus } = request.body;
             logger.info({ CallSid, CallStatus }, 'Call status update');
-            
+
             reply.send({ status: 'received' });
         } catch (error) {
             logger.error('Error handling status callback:', error);
@@ -69,9 +70,21 @@ export async function callRoutes(fastify) {
 
     // Simple test endpoint
     fastify.get('/', async (request, reply) => {
-        return { 
+        return {
             message: 'Voice assistant service is running',
             timestamp: new Date().toISOString()
         };
+    });
+
+    fastify.get('/.well-known/pki-validation/01101B418C41258A67852E0C58376C9C.txt', (req, res) => {
+        res.type('text/plain');
+        console.log(fs);
+        fs.readFile('01101B418C41258A67852E0C58376C9C.txt', 'utf8', (err, data) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                return res.status(500).send('Error reading file');
+            }
+            res.send(data);
+        });
     });
 }
