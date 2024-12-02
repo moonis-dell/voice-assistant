@@ -54,6 +54,10 @@ export async function setupWebSocketHandler(connection, req) {
                         for await (const event of transcriptionStream.TranscriptResultStream) {
                             if (event.TranscriptEvent?.Transcript?.Results?.[0]) {
                                 const result = event.TranscriptEvent.Transcript.Results[0];
+                                if(result.IsPartial){
+                                    const ptranscript = result.Alternatives[0].Transcript;
+                                    logger.info({ptranscript},'Partial Transcript')
+                                }
 
                                 if (!result.IsPartial) {
                                     const transcript = result.Alternatives[0].Transcript;
