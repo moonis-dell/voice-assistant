@@ -1,33 +1,33 @@
 // src/services/audio/transformer.js
 import { Transform } from 'stream';
+import { PassThrough } from 'stream';
 import { Buffer } from 'buffer';
 import alawmulaw from 'alawmulaw';
 import { logger } from '../../utils/logger.js';
 
 export class AudioTransformer extends Transform {
-    constructor() {
+    constructor(config) {
         super();
-        this.audioBuffer = Buffer.alloc(0);        
+        // Create PassThrough stream with optimal buffer size
+        this.passthroughStream = new PassThrough({
+            highWaterMark: config.audio.chunkSize
+        });
     }
 
     createReadableStream() {
-        return this;
+        return this.passthroughStream;
     }
 
     _transform(chunk, encoding, callback) {
         try {
             const msg = JSON.parse(chunk.toString('utf8'));
             if (msg.event === 'media' && msg.media?.payload) {
-                const buffer = Buffer.from(msg.media?.payload, 'base64');
-
-                 // Skip silent audio
-                 if (this.isSilent(buffer)) {
-                    return callback();
-                }
-                const processedAudio = this.processAudioChunk(buffer);
-                this.push(processedAudio);
-
+                const buffer = Buffer.from(msg.media.payload, 'base64');
+                const muLawSamples = new Uint8Array(buffer);
+                const pcmSamples = alawmulaw.mulaw.decode(muLawSamples);
                 
+                // Stream the PCM data immediately
+                this.passthroughStream.write(Buffer.from(pcmSamples.buffer));
             }
             callback();
         } catch (error) {
@@ -36,14 +36,8 @@ export class AudioTransformer extends Transform {
         }
     }
 
-    isSilent(buffer) {
-        // Check if buffer contains only silent audio
-        return buffer.every(byte => byte === buffer[0]);
-    }
-
-    processAudioChunk(buffer) {        
-        const muLawSamples = new Uint8Array(buffer);
-        return Buffer.from(alawmulaw.mulaw.decode(muLawSamples).buffer);
+    _flush(callback) {
+        this.passthroughStream.end();
+        callback();
     }
 }
-

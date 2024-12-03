@@ -1,3 +1,4 @@
 node_modules
 systemd-service.txt
 .env
+voice-assistant-cft.yaml

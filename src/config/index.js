@@ -31,7 +31,7 @@ export const config = {
     audio: {
         sampleRate: 8000,
         encoding: 'pcm',
-        chunkSize: 8192
+        chunkSize: 320
     },
     tts: {
         provider: process.env.TTS_PROVIDER || 'polly',

@@ -7,16 +7,8 @@ import { logger } from '../../utils/logger.js';
 
 export class TranscribeClient {
     constructor(config) {
-        // if (!config.aws.accessKeyId || !config.aws.secretAccessKey) {
-        //     throw new Error('AWS credentials not provided');
-        // }
-
         this.client = new TranscribeStreamingClient({
             region: config.aws.region,
-            // credentials: {
-            //     accessKeyId: config.aws.accessKeyId,
-            //     secretAccessKey: config.aws.secretAccessKey
-            // }          
         });
         this.config = config;
     }
@@ -30,13 +22,13 @@ export class TranscribeClient {
                 MediaSampleRateHertz: this.config.audio.sampleRate,
                 MediaEncoding: "pcm",
                 AudioStream: this.createAudioStream(audioStream),
+                // Enable partial results with low stability for faster transcription
                 EnablePartialResultsStabilization: true,
-                PartialResultsStability: "high",
-                ShowSpeakerLabels: false,
-                //VocabularyName: this.config.aws.vocabularyName // optional
+                PartialResultsStability: "low",
+                // Disable features we don't need for faster processing
+                ShowSpeakerLabels: false
             });
 
-            logger.info('Sending transcription command');
             return await this.client.send(command);
         } catch (error) {
             logger.error('Failed to start transcription stream:', {

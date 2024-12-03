@@ -7,8 +7,12 @@
         "dev": "nodemon src/server.js",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
     },
-    "dependencies": {        
-        "@aws-sdk/client-transcribe-streaming": "^3.x",        
+    "dependencies": {
+        "@aws-sdk/client-dynamodb": "^3.699.0",
+        "@aws-sdk/client-s3": "^3.701.0",
+        "@aws-sdk/client-transcribe-streaming": "^3.x",
+        "@aws-sdk/lib-dynamodb": "^3.699.0",
+        "@aws-sdk/util-dynamodb": "^3.x",
         "@fastify/formbody": "^7.0.0",
         "@fastify/rate-limit": "^8.x",
         "@fastify/websocket": "^8.2.0",
@@ -17,18 +21,15 @@
         "dotenv": "^16.3.1",
         "fastify": "^4.24.3",
         "fs": "^0.0.1-security",
-        "groq-sdk": "^0.8.0",    
+        "groq-sdk": "^0.8.0",
+        "interleave-stream": "^1.0.2",
         "pino": "^8.16.2",
         "pino-pretty": "^10.0.0",
+        "stream": "^0.0.3",
         "twilio": "^5.3.6",
         "websocket-stream": "^5.5.2",
         "ws": "^8.14.2",
-        "zod": "^3.23.8",
-        "@aws-sdk/client-dynamodb": "^3.699.0",
-        "@aws-sdk/client-s3": "^3.701.0",
-        "@aws-sdk/lib-dynamodb": "^3.699.0",
-        "@aws-sdk/util-dynamodb": "^3.x",
-        "interleave-stream": "^1.0.2"
+        "zod": "^3.23.8"
     },
     "devDependencies": {
         "eslint": "^8.x",

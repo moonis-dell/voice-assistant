@@ -37,10 +37,10 @@ Was another vehicle involved? If yes ask the following questions -
     Make , year , model of offenders vehicle (if applicable)
     Owner of offendors vehicle (if applicable)
     Is offender insured (if applicable)
-Injury to any other person on street
- 
+Injury to any other person on street 
 To any question, if the user responds with an unclear answer then repeat the question politely. If user says they don't have the answer then move to next question
-Keep responses crisp-concise to the point, polite and understanding`;
+Keep responses crisp-concise to the point, polite and understanding
+Please generate responses for meaningful utterances otherwise send OK as response`;
     }
 
     async generateResponse(transcript, sessionId = null) {
