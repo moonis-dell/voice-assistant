@@ -9,7 +9,7 @@ export class ResponseService {
         //logger.info(this.generator)
     }
 
-    async generateResponse(transcript, sessionId = null) {
+    async generateResponse(transcript, sessionId) {
         return await this.generator.generateResponse(transcript, sessionId);
     }
 
