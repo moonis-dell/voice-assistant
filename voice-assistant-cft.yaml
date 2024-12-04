@@ -198,8 +198,8 @@ Resources:
           WS_BACKLOG=511
 
           #twilio 
-          TWILIO_ACCOUNT_SID=AC43ecb54d8b1a71a8b97e772bd9257b2c
-          TWILIO_AUTH_TOKEN=0901790a7cfb471f1cfb4af066301da3
+          TWILIO_ACCOUNT_SID=xxxxxxxxxxxxxxxx
+          TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxx
 
           LOG_LEVEL=info
           NODE_ENV=development
@@ -207,7 +207,7 @@ Resources:
           #Groq
           RESPONSE_GENERATOR=groq
           GROQ_ENABLED=true
-          GROQ_API_KEY=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
+          GROQ_API_KEY=xxxxxxxxxxxxxx
           GROQ_MODEL=mixtral-8x7b-32768
           GROQ_MAX_TOKENS=100
           GROQ_TEMPERATURE=0.7
