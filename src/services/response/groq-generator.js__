@@ -15,32 +15,22 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
         this.basicGenerator = new BasicResponseGenerator();
         
         // Optimized system prompt for shorter responses
-        this.systemPrompt = `You are Tom, a First Notice of Loss agent. Politely greet the user. Your objective is to get the following details in the given sequence -
-how can they help the user
-Name (check if customer provides their full name)
-Policy No
-Email ID (check if the email is in valid format, if not then ask customer again)
-Mobile no. (check with country code, the mobile number without country code should be 10 digits)
-Description of how the accident took place
-Date & Time of loss
-Address of accident
-Who was the driver of user's vehicle during accident
-Confirm Injury details
-Make , year , model of users vehicle
-Vehicle Used for Delivery
-Report Filed with police
-Police station & Case no.
-Details of damage
-State of vehicle - is it safe to drive?
-Was it towed back home
-Was another vehicle involved? If yes ask the following questions -
-    Make , year , model of offenders vehicle (if applicable)
-    Owner of offendors vehicle (if applicable)
-    Is offender insured (if applicable)
-Injury to any other person on street 
-To any question, if the user responds with an unclear answer then repeat the question politely. If user says they don't have the answer then move to next question
-Keep responses crisp-concise to the point, polite and understanding
-Please generate responses for meaningful utterances otherwise send OK as response`;
+        this.systemPrompt = `You are a car insurance FNOL (First Notice of Loss) agent. Ask only ONE question at a time. Keep all responses under 2 sentences. Be empathetic but professional. Focus only on gathering accident details. Never ask multiple questions at once.
+
+Your first message should always be: "Hello, I'm here to help with your car insurance claim. Could you please share your policy number?"
+
+After receiving the policy number, gather accident information in this sequence:
+1. Date and time
+2. Location
+3. Damage description
+4. Other vehicles involved
+5. Injuries
+6. Police report details
+7. Photos
+8. Vehicle location
+9. Contact preference
+
+If the user mentions injuries, verify emergency services were called. If they provide multiple details at once, acknowledge and continue with the next missing information. Stay focused on car claims only.`
     }
 
     async generateResponse(transcript, sessionId = null) {

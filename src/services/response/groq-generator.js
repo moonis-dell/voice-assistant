@@ -44,11 +44,11 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
                 response: generatedResponse
             });           
 
-            return generatedResponse || this.getFallbackResponse(transcript);
+            return generatedResponse; //|| this.getFallbackResponse(transcript);
 
         } catch (error) {
             logger.error('Local API error:', error);
-            return this.getFallbackResponse(transcript);
+            //return this.getFallbackResponse(transcript);
         }
     }
 

@@ -1,13 +1,11 @@
 // src/routes/call.js
 import { config } from '../config/index.js';
-import { setupWebSocketHandler } from '../services/audio/index.js';
+import { setupWebSocketHandler } from '../services/speech/index.js';
 import { logger } from '../utils/logger.js';
 import { validateTwilioRequest } from '../middleware/validate-twilio.js';
 import fs from 'fs';
 
 export async function callRoutes(fastify) {
-    //fastify.addHook('preHandler', validateTwilioRequest);
-    // Validate incoming call request
     const callSchema = {
         body: {
             type: 'object',
@@ -49,7 +47,6 @@ export async function callRoutes(fastify) {
         try {
             const { CallSid, CallStatus } = request.body;
             logger.info({ CallSid, CallStatus }, 'Call status update');
-
             reply.send({ status: 'received' });
         } catch (error) {
             logger.error('Error handling status callback:', error);
@@ -61,7 +58,10 @@ export async function callRoutes(fastify) {
     fastify.get('/media-stream', { websocket: true }, (connection, req) => {
         try {
             logger.info('New WebSocket connection established');
-            setupWebSocketHandler(connection, req);
+            setupWebSocketHandler(connection, req).catch(error => {
+                logger.error('Error in WebSocket handler:', error);
+                connection.socket.close();
+            });
         } catch (error) {
             logger.error('Error setting up WebSocket handler:', error);
             connection.socket.close();

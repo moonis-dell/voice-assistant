@@ -24,7 +24,7 @@ export class TranscribeClient {
                 AudioStream: this.createAudioStream(audioStream),
                 // Enable partial results with low stability for faster transcription
                 EnablePartialResultsStabilization: true,
-                PartialResultsStability:"high",
+                PartialResultsStability:"low",
                 // Disable features we don't need for faster processing
                 ShowSpeakerLabels: false
             });
