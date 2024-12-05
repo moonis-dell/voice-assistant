@@ -34,22 +34,14 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
             const generatedResponse = await response.text();
 
             const endTime = process.hrtime(startTime);
-            const latencyMs = endTime[0] * 1000 + endTime[1] / 1000000;
-            console.log()
-            console.log()
-            console.log('=========================================================================================')
-            console.log('=========================================================================================')
+            const latencyMs = endTime[0] * 1000 + endTime[1] / 1000000;            
             logger.info({
                 type: 'local_api_latency',
                 latency: latencyMs,
                 sessionId,
-                transcript,
-                response: generatedResponse
-            });           
-            console.log('=========================================================================================')
-            console.log('=========================================================================================')
-            console.log()
-            console.log()
+                //transcript,
+                //response: generatedResponse
+            });             
             return generatedResponse; //|| this.getFallbackResponse(transcript);
 
         } catch (error) {
