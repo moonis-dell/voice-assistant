@@ -27,7 +27,7 @@ export async function callRoutes(fastify) {
 
             const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                 <Response>
-                    <Say>Welcome to the Voice Assistant Service.</Say>
+                    <Say voice="Polly.Gregory">Welcome to the Voice Assistant Service.</Say>
                     <Connect>
                         <Stream url="wss://${request.headers.host}/media-stream" />
                     </Connect>

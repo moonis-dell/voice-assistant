@@ -13,7 +13,7 @@ export class SpeechManager extends EventEmitter {
             transcript: {
                 accumulated: '',
                 timer: null,
-                waitTime: 2000, // 2 seconds
+                waitTime: 1500, // 1.5 seconds
                 lastTranscriptTime: null
             },
             tts: {
@@ -65,7 +65,7 @@ export class SpeechManager extends EventEmitter {
 
         this.state.transcript.lastTranscriptTime = Date.now();
         console.log(`[${this.getTimestamp()}] Accumulated transcript: "${this.state.transcript.accumulated}"`);
-        console.log(`[${this.getTimestamp()}] Starting 2-second timer...`);
+        console.log(`[${this.getTimestamp()}] Starting 1.5-second timer...`);
 
         this.resetTranscriptTimer();
     }
