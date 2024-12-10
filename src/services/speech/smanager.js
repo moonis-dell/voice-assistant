@@ -91,7 +91,7 @@ export class SpeechManager extends EventEmitter {
 
         this.state.transcript.timer = setTimeout(() => {
             const timeWaited = (Date.now() - this.state.transcript.lastTranscriptTime) / 1000;
-            console.log(`Timer completed after seconds`);
+            console.log(`Timer completed after ${timeWaited} seconds`);
             this.processAccumulatedTranscript();
         }, this.state.transcript.waitTime);
     }
