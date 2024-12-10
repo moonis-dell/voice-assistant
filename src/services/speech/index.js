@@ -9,8 +9,15 @@ import { WebSocketHandler } from './wshandler.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
-export async function setupWebSocketHandler(connection, req) {
+/**
+ * Sets up the WebSocket handler with all required services
+ * @param {WebSocket} connection - WebSocket connection
+ * @param {Object} req - Request object
+ * @returns {Promise<WebSocketHandler>}
+ */
+export async function setupWebSocketHandler(connection, req, config) {
     try {
+        // Initialize all required services
         const services = {
             audioTransformer: new AudioTransformer(config),
             transcribeService: new TranscribeService(config),
@@ -19,17 +26,17 @@ export async function setupWebSocketHandler(connection, req) {
             transcriptService: new TranscriptService(config),
             cleanup: async () => {
                 logger.info('Cleaning up services');
+                // Add any specific cleanup logic here
             }
         };
 
         const speechManager = new SpeechManager(config);
         const wsHandler = new WebSocketHandler(connection.socket, speechManager, services);
 
-        console.log(`[${new Date().toISOString().split('T')[1].slice(0, -1)}] WebSocket handler setup complete`);
+        logger.info('WebSocket handler setup complete');
         return wsHandler;
     } catch (error) {
-        console.error(`[${new Date().toISOString().split('T')[1].slice(0, -1)}] Error setting up WebSocket handler:`, error);
-        logger.error('Error setting up WebSocket handler:', error);
+        logger.error({ error }, 'Error setting up WebSocket handler');
         throw error;
     }
 }

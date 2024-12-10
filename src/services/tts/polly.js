@@ -1,26 +1,36 @@
 import AWS from 'aws-sdk';
 import alawmulaw from 'alawmulaw';
+import { Transform } from 'stream';
+
+const CHUNK_SIZE = 320; // Standard size for audio chunks in bytes
 
 export class PollyTTSService {
     constructor(config) {
         this.polly = new AWS.Polly({
             region: config.aws.region,
-            // credentials: {
-            //     accessKeyId: config.aws.accessKeyId,
-            //     secretAccessKey: config.aws.secretAccessKey
-            // }
         });
         this.cache = new Map();
         this.config = config;
-       
     }
 
-    async synthesize(text,callId) {
-        const cacheKey = `${this.config.tts.voiceId}:${text}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
+    async* generateAudioChunks(audioBuffer) {
+        // Create Int16Array from the complete buffer
+        const pcmSamples = new Int16Array(audioBuffer);
+        
+        // Process in chunks
+        for (let offset = 0; offset < pcmSamples.length; offset += CHUNK_SIZE) {
+            // Get chunk of PCM samples
+            const chunk = pcmSamples.slice(offset, offset + CHUNK_SIZE);
+            
+            // Convert chunk to mu-law
+            const muLawChunk = alawmulaw.mulaw.encode(chunk);
+            
+            // Convert to base64 and yield
+            yield Buffer.from(muLawChunk).toString('base64');
         }
+    }
 
+    async synthesize(text, callId) {
         const params = {
             Engine: 'neural',
             OutputFormat: 'pcm',
@@ -36,12 +46,9 @@ export class PollyTTSService {
                 throw new Error('Invalid Polly response');
             }
 
-            const pcmSamples = new Int16Array(response.AudioStream.buffer);
-            const muLawSamples = alawmulaw.mulaw.encode(pcmSamples);
-            const audioData = Buffer.from(muLawSamples).toString('base64');           
-            
-            this.cache.set(cacheKey, audioData);
-            return audioData;
+            // Return an async generator for streaming chunks
+            return this.generateAudioChunks(response.AudioStream.buffer);
+
         } catch (error) {
             console.error('Polly TTS error:', error);
             throw error;

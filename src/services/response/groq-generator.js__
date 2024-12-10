@@ -15,29 +15,14 @@ export class GroqResponseGenerator extends BaseResponseGenerator {
         this.basicGenerator = new BasicResponseGenerator();
         
         // Optimized system prompt for shorter responses
-        this.systemPrompt = `You are a car insurance FNOL (First Notice of Loss) agent. Ask only ONE question at a time. Keep all responses under 2 sentences. Be empathetic but professional. Focus only on gathering accident details. Never ask multiple questions at once.
-
-Your first message should always be: "Hello, I'm here to help with your car insurance claim. Could you please share your policy number?"
-
-After receiving the policy number, gather accident information in this sequence:
-1. Date and time
-2. Location
-3. Damage description
-4. Other vehicles involved
-5. Injuries
-6. Police report details
-7. Photos
-8. Vehicle location
-9. Contact preference
-
-If the user mentions injuries, verify emergency services were called. If they provide multiple details at once, acknowledge and continue with the next missing information. Stay focused on car claims only.`
+        this.systemPrompt = `You are a writer`
     }
 
     async generateResponse(transcript, sessionId = null) {
         const startTime = process.hrtime();
         try {
             const context = sessionId ?
-                this.getConversationHistory(sessionId).slice(-2) : // Reduced context
+                this.getConversationHistory(sessionId): // Reduced context
                 [];
 
             const completion = await this.client.chat.completions.create({

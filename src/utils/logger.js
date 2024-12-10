@@ -17,4 +17,3 @@ export const logger = pino({
     //     instance: process.env.EC2_INSTANCE_ID || 'unknown'
     // }
 });
-

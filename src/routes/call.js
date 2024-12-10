@@ -58,7 +58,7 @@ export async function callRoutes(fastify) {
     fastify.get('/media-stream', { websocket: true }, (connection, req) => {
         try {
             logger.info('New WebSocket connection established');
-            setupWebSocketHandler(connection, req).catch(error => {
+            setupWebSocketHandler(connection, req,config).catch(error => {
                 logger.error('Error in WebSocket handler:', error);
                 connection.socket.close();
             });

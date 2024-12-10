@@ -1,54 +1,53 @@
-// src/services/speech/WebSocketHandler.js
 import { logger } from '../../utils/logger.js';
 
+/**
+ * Handles WebSocket connections and audio streaming for the voice assistant
+ * @class WebSocketHandler
+ */
 export class WebSocketHandler {
     constructor(socket, speechManager, services) {
         this.socket = socket;
         this.speechManager = speechManager;
         this.services = services;
+        this.markQueue = [];
+        this.lastResponseStartTime = null;
+        this.isInterrupted = false;
         this.setupEventHandlers();
     }
 
-    getTimestamp() {
-        return new Date().toISOString().split('T')[1].slice(0, -1);
-    }
-
     setupEventHandlers() {
+        // WebSocket event handlers
         this.socket.on('message', async (rawData) => {
             try {
-                let data;
-                if (Buffer.isBuffer(rawData)) {
-                    data = rawData.toString('utf8');
-                } else if (typeof rawData === 'string') {
-                    data = rawData;
-                } else if (rawData instanceof Uint8Array) {
-                    data = Buffer.from(rawData).toString('utf8');
-                } else {
-                    throw new Error('Unsupported data format');
-                }
-
-                const msg = JSON.parse(data);
-                await this.handleMessage(msg);
+                const data = this.parseWebSocketMessage(rawData);
+                await this.handleMessage(JSON.parse(data));
             } catch (error) {
-                console.error(`[${this.getTimestamp()}] WebSocket message error:`, error);
-                logger.error('Error processing WebSocket message:', {
-                    error: error.message,
-                    dataType: typeof rawData,
-                    isBuffer: Buffer.isBuffer(rawData)
-                });
+                logger.error({ error }, 'WebSocket message error');
             }
         });
 
         this.socket.on('close', () => this.handleClose());
         this.socket.on('error', (error) => this.handleError(error));
 
+        // Speech manager event handlers
         this.speechManager.on('processingTranscript', async (transcript) => {
             await this.handleTranscriptProcessing(transcript);
         });
 
-        this.speechManager.on('ttsStopped', () => {
-            this.sendStopTTS();
+        this.speechManager.on('speakerChange', ({ previous, current }) => {
+           // logger.info({ previous, current }, 'Speaker changed');
         });
+    }
+
+    parseWebSocketMessage(rawData) {
+        if (Buffer.isBuffer(rawData)) {
+            return rawData.toString('utf8');
+        } else if (typeof rawData === 'string') {
+            return rawData;
+        } else if (rawData instanceof Uint8Array) {
+            return Buffer.from(rawData).toString('utf8');
+        }
+        throw new Error('Unsupported WebSocket data format');
     }
 
     async handleMessage(msg) {
@@ -60,18 +59,17 @@ export class WebSocketHandler {
                 case 'media':
                     await this.handleMedia(msg);
                     break;
+                case 'mark':
+                    this.handleMarkEvent();
+                    break;
                 case 'stop':
                     await this.handleStop();
                     break;
                 default:
-                    console.log(`[${this.getTimestamp()}] Unknown message event:`, msg.event);
+                    logger.warn({ event: msg.event }, 'Unknown message event');
             }
         } catch (error) {
-            console.error(`[${this.getTimestamp()}] Message handling error:`, error);
-            logger.error('Message handling error:', {
-                error: error.message,
-                event: msg?.event
-            });
+            logger.error({ error, event: msg?.event }, 'Message handling error');
         }
     }
 
@@ -81,7 +79,7 @@ export class WebSocketHandler {
         
         const audioStream = this.services.audioTransformer.createReadableStream();
         const transcriptionStream = await this.services.transcribeService.startStream(audioStream);
-
+        
         this.handleTranscriptionStream(transcriptionStream);
     }
 
@@ -91,85 +89,155 @@ export class WebSocketHandler {
                 if (event.TranscriptEvent?.Transcript?.Results?.[0]) {
                     const result = event.TranscriptEvent.Transcript.Results[0];
                     const transcript = result.Alternatives[0].Transcript;
-                    console.log(`[${this.getTimestamp()}] Partial transcript: `+transcript);
-                   // if (!result.IsPartial && transcript.trim()) {
-                        //console.log(`[${this.getTimestamp()}] Received  transcript`);
+                    if (transcript.trim()) {
                         this.speechManager.handleTranscript(transcript, result.IsPartial);
-                    //}
+                    }
                 }
             }
         } catch (error) {
-            console.error(`[${this.getTimestamp()}] Transcription stream error:`, error);
-            logger.error('Transcription stream error:', error);
+            logger.error({ error }, 'Transcription stream error');
+        }
+    }
+
+    sendMark() {
+        const markEvent = {
+            event: 'mark',
+            streamSid: this.speechManager.state.streamSid,
+            mark: { name: 'responsePart' }
+        };
+        this.socket.send(JSON.stringify(markEvent));
+        this.markQueue.push('responsePart');
+    }
+
+    handleMarkEvent() {
+        //console.log('Mark Event Received!')
+        if (this.markQueue.length > 0) {
+            this.markQueue.shift();
+        }
+    }
+
+    handleCustomerSpeech() {
+        // Only handle if we have marks in queue AND a valid start timestamp
+        if (this.markQueue.length > 0 && this.lastResponseStartTime != null) {
+            // Calculate how long TTS was playing before interruption
+            const elapsedTime = Date.now() - this.lastResponseStartTime;
+            
+            logger.debug(`Speech interrupted after ${elapsedTime}ms of TTS playback`);
+           // console.log('STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! ')
+            // Stop TTS and send clear event
+            this.speechManager.stopTTS();
+            this.socket.send(JSON.stringify({
+                event: 'clear',
+                streamSid: this.speechManager.state.streamSid
+            }));
+    
+            // Reset all tracking variables
+            this.markQueue = [];
+            this.lastResponseStartTime = null;
+            
+            logger.info(`Customer interrupted after ${elapsedTime}ms - cleared audio playback`);
         }
     }
 
     async handleTranscriptProcessing(transcript) {
         try {
-            console.log(`[${this.getTimestamp()}] Generating response for: "${transcript}"`);
+            if (this.speechManager.isSpeaking()) {
+                logger.info('Skipping response generation - TTS in progress');
+                return;
+            }
 
+            logger.info({ transcript }, 'Generating agent response');
             const response = await this.services.responseService.generateResponse(
                 transcript,
                 this.speechManager.state.streamSid
             );
 
-            if (response && !this.speechManager.isSpeaking()) {
-                console.log(`[${this.getTimestamp()}] Response generated: "${response}"`);
-                this.speechManager.startTTS();
-                const audioResponse = await this.services.ttsService.synthesize(response);
-                if (audioResponse) {
-                    console.log(`[${this.getTimestamp()}] Sending audio response`);
-                    this.sendAudioResponse(audioResponse);
-                }
-                this.speechManager.stopTTS();
+            if (response) {
+                await this.generateAndStreamTTS(response);
             }
         } catch (error) {
-            console.error(`[${this.getTimestamp()}] Response processing error:`, error);
-            logger.error('Response processing error:', error);
+            logger.error({ error }, 'Response processing error');
+            this.speechManager.stopTTS();
         }
     }
 
-    sendAudioResponse(audioResponse) {
+    async generateAndStreamTTS(response) {
+        try {
+            logger.info({ response }, 'Starting TTS generation');
+            this.speechManager.startTTS();
+            this.lastResponseStartTime = Date.now();
+            let chunkCount = 0;
+            const MARK_INTERVAL = 5; // Send mark every 5 chunks
+
+            const audioGenerator = await this.services.ttsService.synthesize(response);
+            
+            for await (const chunk of audioGenerator) {
+                if (chunk) {
+                    this.sendAudioChunk(chunk);                    
+                           
+                        this.sendMark();
+                    
+                    
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+            }
+
+            this.speechManager.stopTTS();
+            this.lastResponseStartTime = null;
+        } catch (error) {
+            logger.error({ error }, 'Error in TTS generation');
+            this.speechManager.stopTTS();
+        }
+    }
+
+    async handleMedia(msg) {
+        if (!this.speechManager.isStreaming()) {
+            logger.warn('Received media before stream start');
+            return;
+        }
+
+        // Only check for interruption if not already interrupted
+        if (this.markQueue.length > 0 && this.lastResponseStartTime != null) {
+            this.handleCustomerSpeech();
+        }
+
+        this.services.audioTransformer.write(JSON.stringify(msg));
+    }
+
+    sendAudioChunk(audioChunk) {
+        const EXPECTED_CHUNK_SIZE = 320; // Standard chunk size for 20ms of audio at 8kHz
+        
+        if (Buffer.from(audioChunk, 'base64').length !== EXPECTED_CHUNK_SIZE) {
+            logger.warn('Unexpected chunk size:', Buffer.from(audioChunk, 'base64').length);
+        }
+
         const messageToSend = {
             event: 'media',
             streamSid: this.speechManager.state.streamSid,
-            media: { payload: audioResponse }
+            media: { payload: audioChunk }
         };
         this.socket.send(JSON.stringify(messageToSend));
     }
 
-    sendStopTTS() {
-        console.log(`[${this.getTimestamp()}] Sending stop TTS signal`);
-        this.socket.send(JSON.stringify({
-            event: 'stop_tts',
-            streamSid: this.speechManager.state.streamSid
-        }));
-    }
-
-    handleMedia(msg) {
-        if (!this.speechManager.isStreaming()) {
-            console.warn(`[${this.getTimestamp()}] Received media before stream start`);
-            return;
-        }
-        this.services.audioTransformer.write(JSON.stringify(msg));
-    }
-
     async handleStop() {
-        console.log(`[${this.getTimestamp()}] Handling stop event`);
+        logger.info('Handling stop event');
         await this.cleanup();
     }
 
     async handleClose() {
-        console.log(`[${this.getTimestamp()}] WebSocket connection closed`);
+        logger.info('WebSocket connection closed');
         await this.cleanup();
     }
 
     async handleError(error) {
-        console.error(`[${this.getTimestamp()}] WebSocket error:`, error);
+        logger.error({ error }, 'WebSocket error');
         await this.cleanup();
     }
 
     async cleanup() {
+        this.markQueue = [];
+        this.lastResponseStartTime = null;
+        this.isInterrupted = false;
         this.speechManager.cleanup();
         await this.services.cleanup?.();
     }

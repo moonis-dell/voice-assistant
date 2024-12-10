@@ -2,7 +2,6 @@
 import { config } from '../../config/index.js';
 import { PollyTTSService } from './polly.js';
 import { TwiMLTTSService } from './twiml.js';
-
 export class TTSService {
     constructor() {        
         this.service = config.tts.provider === 'polly' 
@@ -14,5 +13,4 @@ export class TTSService {
         return await this.service.synthesize(text);
     }
 }
-
 
