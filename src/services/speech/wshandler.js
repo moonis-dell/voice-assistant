@@ -122,7 +122,7 @@ export class WebSocketHandler {
             // Calculate how long TTS was playing before interruption
             const elapsedTime = Date.now() - this.lastResponseStartTime;
             
-            logger.debug(`Speech interrupted after ${elapsedTime}ms of TTS playback`);
+            logger.info(`Speech interrupted after ${elapsedTime}ms of TTS playback`);
            // console.log('STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! ')
             // Stop TTS and send clear event
             this.speechManager.stopTTS();
@@ -141,10 +141,10 @@ export class WebSocketHandler {
 
     async handleTranscriptProcessing(transcript) {
         try {
-            // if (this.speechManager.isSpeaking()) {
-            //     logger.info('Skipping response generation - TTS in progress');
-            //     return;
-            // }
+            if (this.speechManager.isSpeaking()) {
+                logger.info('Skipping response generation - TTS in progress');
+                return;
+            }
 
             logger.info({ transcript }, 'Generating agent response');
             const response = await this.services.responseService.generateResponse(
