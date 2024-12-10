@@ -141,10 +141,10 @@ export class WebSocketHandler {
 
     async handleTranscriptProcessing(transcript) {
         try {
-            if (this.speechManager.isSpeaking()) {
-                logger.info('Skipping response generation - TTS in progress');
-                return;
-            }
+            // if (this.speechManager.isSpeaking()) {
+            //     logger.info('Skipping response generation - TTS in progress');
+            //     return;
+            // }
 
             logger.info({ transcript }, 'Generating agent response');
             const response = await this.services.responseService.generateResponse(
