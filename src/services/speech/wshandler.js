@@ -12,6 +12,7 @@ export class WebSocketHandler {
         this.markQueue = [];
         this.lastResponseStartTime = null;
         this.isInterrupted = false;
+        this.audioGeneratorController = null;
         this.setupEventHandlers();
     }
 
@@ -35,7 +36,7 @@ export class WebSocketHandler {
         });
 
         this.speechManager.on('speakerChange', ({ previous, current }) => {
-           // logger.info({ previous, current }, 'Speaker changed');
+            // logger.info({ previous, current }, 'Speaker changed');
         });
     }
 
@@ -76,10 +77,10 @@ export class WebSocketHandler {
     async handleStart(msg) {
         const { streamSid } = msg.start;
         this.speechManager.setStreamSid(streamSid);
-        
+
         const audioStream = this.services.audioTransformer.createReadableStream();
         const transcriptionStream = await this.services.transcribeService.startStream(audioStream);
-        
+
         this.handleTranscriptionStream(transcriptionStream);
     }
 
@@ -121,20 +122,27 @@ export class WebSocketHandler {
         if (this.markQueue.length > 0 && this.lastResponseStartTime != null) {
             // Calculate how long TTS was playing before interruption
             const elapsedTime = Date.now() - this.lastResponseStartTime;
-            
+
             logger.info(`Speech interrupted after ${elapsedTime}ms of TTS playback`);
-           // console.log('STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! ')
+            // console.log('STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! STOPPED!!! ')
+
+            // Stop TTS audio generator
+            if (this.audioGeneratorController) {
+                this.audioGeneratorController.abort();
+                this.audioGeneratorController = null;
+            }
+
             // Stop TTS and send clear event
             this.speechManager.stopTTS();
             this.socket.send(JSON.stringify({
                 event: 'clear',
                 streamSid: this.speechManager.state.streamSid
             }));
-    
+
             // Reset all tracking variables
             this.markQueue = [];
             this.lastResponseStartTime = null;
-            
+
             logger.info(`Customer interrupted after ${elapsedTime}ms - cleared audio playback`);
         }
     }
@@ -169,15 +177,22 @@ export class WebSocketHandler {
             let chunkCount = 0;
             const MARK_INTERVAL = 5; // Send mark every 5 chunks
 
+            this.audioGeneratorController = new AbortController(); // Create new controller
             const audioGenerator = await this.services.ttsService.synthesize(response);
-            
+
             for await (const chunk of audioGenerator) {
+
+                // Check if we've been interrupted
+                if (this.audioGeneratorController.signal.aborted) {
+                    logger.info('TTS stream aborted');
+                    break;
+                }
                 if (chunk) {
-                    this.sendAudioChunk(chunk);                  
-                           
-                        this.sendMark();
-                    
-                    
+                    this.sendAudioChunk(chunk);
+
+                    this.sendMark();
+
+
                     await new Promise(resolve => setTimeout(resolve, 20));
                 }
             }
@@ -206,7 +221,7 @@ export class WebSocketHandler {
 
     sendAudioChunk(audioChunk) {
         const EXPECTED_CHUNK_SIZE = 320; // Standard chunk size for 20ms of audio at 8kHz
-        
+
         if (Buffer.from(audioChunk, 'base64').length !== EXPECTED_CHUNK_SIZE) {
             logger.warn('Unexpected chunk size:', Buffer.from(audioChunk, 'base64').length);
         }

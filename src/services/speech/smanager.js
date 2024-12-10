@@ -18,7 +18,7 @@ export class SpeechManager extends EventEmitter {
             transcript: {
                 accumulated: '',
                 timer: null,
-                waitTime: 2000, // 1.5 seconds wait time for final transcript
+                waitTime: 1500, // 1.5 seconds wait time for final transcript
                 lastTranscriptTime: null
             },
             tts: {
@@ -61,7 +61,7 @@ export class SpeechManager extends EventEmitter {
         this.setCurrentSpeaker(this.SPEAKERS.CUSTOMER);
 
         if (isPartial) {
-            //this.resetTranscriptTimer();
+            this.resetTranscriptTimer();
             return;
         }
 
