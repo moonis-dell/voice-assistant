@@ -18,7 +18,7 @@ export class SpeechManager extends EventEmitter {
             transcript: {
                 accumulated: '',
                 timer: null,
-                waitTime: 1000, // 1.5 seconds wait time for final transcript
+                waitTime: 2000, // 1.5 seconds wait time for final transcript
                 lastTranscriptTime: null
             },
             tts: {
@@ -61,7 +61,7 @@ export class SpeechManager extends EventEmitter {
         this.setCurrentSpeaker(this.SPEAKERS.CUSTOMER);
 
         if (isPartial) {
-            this.resetTranscriptTimer();
+            //this.resetTranscriptTimer();
             return;
         }
 
@@ -90,7 +90,7 @@ export class SpeechManager extends EventEmitter {
         }
 
         this.state.transcript.timer = setTimeout(() => {
-            //const timeWaited = (Date.now() - this.state.transcript.lastTranscriptTime) / 1000;
+            const timeWaited = (Date.now() - this.state.transcript.lastTranscriptTime) / 1000;
             console.log(`Timer completed after seconds`);
             this.processAccumulatedTranscript();
         }, this.state.transcript.waitTime);
