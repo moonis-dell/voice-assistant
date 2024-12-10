@@ -172,8 +172,8 @@ export class WebSocketHandler {
             const audioGenerator = await this.services.ttsService.synthesize(response);
             
             for await (const chunk of audioGenerator) {
-                if (chunk  && !this.speechManager.isSpeaking()) {
-                    this.sendAudioChunk(chunk);                    
+                if (chunk) {
+                    this.sendAudioChunk(chunk);                  
                            
                         this.sendMark();
                     
